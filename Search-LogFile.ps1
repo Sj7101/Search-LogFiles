@@ -12,12 +12,13 @@ function Search-LogFiles {
     # Iterate through each log file
     foreach ($logFile in $logFiles) {
         $folderPath = [System.IO.Path]::GetDirectoryName($logFile)  # Get the folder path of the log file
-        $driveName = "Z"  # Temporary drive letter
+        $serverName = ($folderPath -split '\\')[2]  # Extract the server name from the UNC path
+        $driveName = "Z$serverName"  # Use a unique temporary drive letter for each server
 
         # Ensure the folderPath is a valid UNC path
         if ($folderPath -match "^\\\\") {
             try {
-                # Create a temporary PSDrive with the provided credentials mapped to the folder
+                # Create a temporary PSDrive with the provided credentials mapped to the folder on the server
                 New-PSDrive -Name $driveName -PSProvider FileSystem -Root $folderPath -Credential $credentials -Persist
 
                 if (Test-Path $logFile) {
@@ -68,8 +69,11 @@ function Search-LogFiles {
 
     return $results
 }
-<#
-$logFiles = @("\\server\share\folder1\log1.log", "\\server\share\folder2\log2.log")
+<# $logFiles = @(
+    "\\server1\share\folder\log1.log", 
+    "\\server2\share\folder\log2.log", 
+    "\\server3\share\folder\log3.log"
+)
 $searchStrings = @("error(s)", "Warning", "Failed")
 $results = Search-LogFiles -logFiles $logFiles -searchStrings $searchStrings
 
