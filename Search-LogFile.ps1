@@ -1,23 +1,3 @@
-# Search-LogFiles PowerShell Function
-
-This PowerShell function allows you to search through log files in a specified directory for a specific string and display the results.
-
-## Features
-
-- Search for a string within all `.log` files in a given directory.
-- Display the log file names where the string is found.
-- Show the lines in the log files where the string matches.
-
-## Requirements
-
-- PowerShell 5.0 or later.
-- Log files should be in the `.log` format (can be customized in the script if needed).
-
-## Usage
-
-### Function Definition
-
-```powershell
 function Search-LogFiles {
     param (
         [string]$logDirectory,    # Directory to search for log files
