@@ -9,19 +9,30 @@ function Search-LogFiles {
     # Prompt for credentials using Get-Credential
     $credentials = Get-Credential
 
+    # Create a temporary PSDrive with the provided credentials
+    $driveName = "Z"  # Temporary drive letter
+    New-PSDrive -Name $driveName -PSProvider FileSystem -Root "\\server\share" -Credential $credentials -Persist
+
     # Iterate through each log file
     foreach ($logFile in $logFiles) {
-        if (Test-Path $logFile) {
-            Write-Host "Searching in: $logFile"
-            
-            # If elevated permissions are needed, run the script with the provided credentials
-            $logContent = Invoke-Command -ScriptBlock {
-                Get-Content -Path $using:logFile
-            } -Credential $credentials
+        $mappedPath = $logFile -replace "^\\\\", "\\$driveName\"  # Replace UNC with mapped drive
 
-            # Search for any of the strings in the array
+        if (Test-Path $mappedPath) {
+            Write-Host "Searching in: $mappedPath"
+            
+            # Read the content of the log file
+            $logContent = Get-Content -Path $mappedPath
+
+            # Search for any of the strings in the array using RegEx
             foreach ($searchString in $searchStrings) {
-                $matches = $logContent | Select-String -Pattern $searchString
+                # If searching for "error(s)", use a RegEx pattern
+                if ($searchString -match "^error\(s\)$") {
+                    $pattern = '\d+ error\(s\)'  # Match "1 error(s)", "2 error(s)", etc.
+                } else {
+                    $pattern = $searchString  # Use the search string directly
+                }
+
+                $matches = $logContent | Select-String -Pattern $pattern
                 if ($matches) {
                     foreach ($match in $matches) {
                         $resultObject = [PSCustomObject]@{
@@ -40,11 +51,14 @@ function Search-LogFiles {
         }
     }
 
+    # Remove the temporary mapped drive after usage
+    Remove-PSDrive -Name $driveName
+
     return $results
 }
 <#
-$logFiles = @("C:\Logs\log1.log", "C:\Logs\log2.log")
-$searchStrings = @("Shawn@Test.com", "Bill@Test.com")
+$logFiles = @("\\server\share\log1.log", "\\server\share\log2.log")
+$searchStrings = @("error(s)")  # This will match "1 error(s)", "2 error(s)", etc.
 $results = Search-LogFiles -logFiles $logFiles -searchStrings $searchStrings
 
 # Display the results
