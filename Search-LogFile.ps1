@@ -23,6 +23,14 @@ function Search-LogFiles {
             # Debugging: Output the folder path we are mapping to
             Write-Host "Mapping the folder: $folderPath"
             
+            # First, check if the UNC path is valid before mapping it
+            if (Test-Path $folderPath) {
+                Write-Host "The folder path '$folderPath' exists and is accessible."
+            } else {
+                Write-Host "ERROR: The folder path '$folderPath' does not exist or is not accessible."
+                return
+            }
+
             # Map the UNC folder path to a temporary drive (directly to the 'logs' folder)
             New-PSDrive -Name $driveName -PSProvider FileSystem -Root $folderPath -Credential $credentials
 
@@ -80,8 +88,8 @@ function Search-LogFiles {
 
     return $results
 }
-<# 
-$folderPath = "\\server1\D$\Folder\ziplip\logs"
+<#
+$folderPath = "\\server1\D$\Logs\Many\ziplip\logs"
 $searchPattern = "SMTP*"  # Match all files starting with SMTP
 $searchStrings = @("error(s)", "Warning", "Failed")
 
