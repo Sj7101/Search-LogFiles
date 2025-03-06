@@ -13,16 +13,21 @@ function Search-LogFiles {
         $credentials = Get-Credential
     }
 
-    # Iterate through each log file
-    foreach ($logFile in $logFiles) {
-        $logFolderPath = [System.IO.Path]::GetDirectoryName($logFile)  # Get the folder path of the log file
+    # Create a temporary drive letter based on the server name
+    $serverName = ($folderPath -split '\\')[2]  # Extract the server name from the UNC path
+    $driveName = "Z"  # Use a fixed temporary drive letter (Z)
 
+    # Ensure the folderPath is a valid UNC path
+    if ($folderPath -match "^\\\\") {
         try {
-            # Create a temporary PSDrive with the provided credentials mapped to the folder (without Persist)
-            New-PSDrive -Name Z -PSProvider FileSystem -Root $logFolderPath -Credential $credentials
+            # Map the UNC folder path to a temporary drive (directly to the folder)
+            New-PSDrive -Name $driveName -PSProvider FileSystem -Root $folderPath -Credential $credentials
 
+            # Debugging: Confirm folder is mapped correctly
+            Write-Host "Mapped drive: \\$driveName"
+            
             # Get all the log files matching the search pattern (e.g., SMTP*) - no file extension filter
-            $logFiles = Get-ChildItem -Path "Z:\" -Filter $searchPattern -File
+            $logFiles = Get-ChildItem -Path "\\$driveName" -Filter $searchPattern -File
 
             # Check if any files are found
             if ($logFiles.Count -eq 0) {
@@ -62,10 +67,12 @@ function Search-LogFiles {
             }
 
             # Remove the temporary mapped drive after usage
-            Remove-PSDrive -Name Z
+            Remove-PSDrive -Name $driveName
         } catch {
-            Write-Host "Error mapping network drive to $($logFolderPath): $_"
+            Write-Host "Error mapping network drive to $($folderPath): $_"
         }
+    } else {
+        Write-Host "Invalid network path: $folderPath"
     }
 
     return $results
