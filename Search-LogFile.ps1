@@ -9,17 +9,20 @@ function Search-LogFiles {
     # Prompt for credentials using Get-Credential
     $credentials = Get-Credential
 
-    # Create a temporary PSDrive with the provided credentials
-    $driveName = "Z"  # Temporary drive letter
-    New-PSDrive -Name $driveName -PSProvider FileSystem -Root "\\server\share" -Credential $credentials -Persist
-
     # Iterate through each log file
     foreach ($logFile in $logFiles) {
-        $mappedPath = $logFile -replace "^\\\\", "\\$driveName\"  # Replace UNC with mapped drive
+        $folderPath = [System.IO.Path]::GetDirectoryName($logFile)  # Get the folder path of the log file
+        $driveName = "Z"  # Temporary drive letter
 
-        if (Test-Path $mappedPath) {
-            Write-Host "Searching in: $mappedPath"
+        # Create a temporary PSDrive with the provided credentials mapped to the folder
+        New-PSDrive -Name $driveName -PSProvider FileSystem -Root $folderPath -Credential $credentials -Persist
+
+        if (Test-Path $logFile) {
+            Write-Host "Searching in: $logFile"
             
+            # Replace the UNC path with the mapped drive letter for the file
+            $mappedPath = $logFile -replace "^\\\\", "\\$driveName\"
+
             # Read the content of the log file
             $logContent = Get-Content -Path $mappedPath
 
@@ -49,16 +52,16 @@ function Search-LogFiles {
         } else {
             Write-Host "Log file not found: $logFile"
         }
-    }
 
-    # Remove the temporary mapped drive after usage
-    Remove-PSDrive -Name $driveName
+        # Remove the temporary mapped drive after usage
+        Remove-PSDrive -Name $driveName
+    }
 
     return $results
 }
 <#
-$logFiles = @("\\server\share\log1.log", "\\server\share\log2.log")
-$searchStrings = @("error(s)")  # This will match "1 error(s)", "2 error(s)", etc.
+$logFiles = @("\\server\share\folder1\log1.log", "\\server\share\folder2\log2.log")
+$searchStrings = @("error(s)", "Warning", "Failed")
 $results = Search-LogFiles -logFiles $logFiles -searchStrings $searchStrings
 
 # Display the results
