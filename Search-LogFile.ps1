@@ -1,33 +1,39 @@
 function Search-LogFiles {
     param (
-        [string[]]$logFiles,      # Array of log file paths to search
-        [string]$searchString     # The string to search for
+        [string[]]$logFiles,          # Array of log file paths to search
+        [string[]]$searchStrings      # Array of strings to search for
     )
     
     $results = @()
+
+    # Prompt for credentials using Get-Credential
+    $credentials = Get-Credential
 
     # Iterate through each log file
     foreach ($logFile in $logFiles) {
         if (Test-Path $logFile) {
             Write-Host "Searching in: $logFile"
             
-            # Read the content of the log file
-            $logContent = Get-Content -Path $logFile
-            
-            # Search for the string and collect matches
-            $matches = $logContent | Select-String -Pattern $searchString
-            if ($matches) {
-                foreach ($match in $matches) {
-                    $resultObject = [PSCustomObject]@{
-                        LogFile   = $logFile
-                        Line      = $match.Line
-                        LineNumber= $match.LineNumber
-                        Match     = $match.Matches.Value
+            # If elevated permissions are needed, run the script with the provided credentials
+            $logContent = Invoke-Command -ScriptBlock {
+                Get-Content -Path $using:logFile
+            } -Credential $credentials
+
+            # Search for any of the strings in the array
+            foreach ($searchString in $searchStrings) {
+                $matches = $logContent | Select-String -Pattern $searchString
+                if ($matches) {
+                    foreach ($match in $matches) {
+                        $resultObject = [PSCustomObject]@{
+                            LogFile     = $logFile
+                            Line        = $match.Line
+                            LineNumber  = $match.LineNumber
+                            Match       = $match.Matches.Value
+                            SearchString= $searchString
+                        }
+                        $results += $resultObject
                     }
-                    $results += $resultObject
                 }
-            } else {
-                Write-Host "No matches found in: $logFile"
             }
         } else {
             Write-Host "Log file not found: $logFile"
@@ -36,14 +42,11 @@ function Search-LogFiles {
 
     return $results
 }
-
-
 <#
 $logFiles = @("C:\Logs\log1.log", "C:\Logs\log2.log")
-$searchString = "Error"
-$results = Search-LogFiles -logFiles $logFiles -searchString $searchString
+$searchStrings = @("Shawn@Test.com", "Bill@Test.com")
+$results = Search-LogFiles -logFiles $logFiles -searchStrings $searchStrings
 
 # Display the results
-$results | Format-Table -Property LogFile, LineNumber, Match
-
+$results | Format-Table -Property LogFile, LineNumber, Match, SearchString
 #>

@@ -1,21 +1,22 @@
 # Search-LogFiles PowerShell Function
 
-This PowerShell function allows you to search through one or more log files in a specified directory for a specific string and return an object containing the search results.
+This PowerShell function allows you to search through one or more log files in a specified directory for multiple strings and return an object containing the search results. It supports running the search with a user account for accessing log files that require elevated permissions using `Get-Credential`.
 
 ## Features
 
-- Search for a string within multiple `.log` files.
-- Return an object with details about each match found.
+- Search for multiple strings within one or more `.log` files.
+- Return an object with details about each match found:
   - Log file name
   - Line number
   - The exact match
-- Support for searching multiple log files at once.
-- Allows easy integration into other scripts for further processing.
+  - The search string that was matched
+- Supports elevated permissions by using `Get-Credential` to access log files on remote servers or protected locations.
 
 ## Requirements
 
 - PowerShell 5.0 or later.
 - Log files should be in the `.log` format (can be customized if needed).
+- Elevated permissions (optional) for accessing restricted log files.
 
 ## Usage
 
@@ -24,34 +25,40 @@ This PowerShell function allows you to search through one or more log files in a
 ```powershell
 function Search-LogFiles {
     param (
-        [string[]]$logFiles,      # Array of log file paths to search
-        [string]$searchString     # The string to search for
+        [string[]]$logFiles,          # Array of log file paths to search
+        [string[]]$searchStrings      # Array of strings to search for
     )
     
     $results = @()
+
+    # Prompt for credentials using Get-Credential
+    $credentials = Get-Credential
 
     # Iterate through each log file
     foreach ($logFile in $logFiles) {
         if (Test-Path $logFile) {
             Write-Host "Searching in: $logFile"
             
-            # Read the content of the log file
-            $logContent = Get-Content -Path $logFile
-            
-            # Search for the string and collect matches
-            $matches = $logContent | Select-String -Pattern $searchString
-            if ($matches) {
-                foreach ($match in $matches) {
-                    $resultObject = [PSCustomObject]@{
-                        LogFile   = $logFile
-                        Line      = $match.Line
-                        LineNumber= $match.LineNumber
-                        Match     = $match.Matches.Value
+            # If elevated permissions are needed, run the script with the provided credentials
+            $logContent = Invoke-Command -ScriptBlock {
+                Get-Content -Path $using:logFile
+            } -Credential $credentials
+
+            # Search for any of the strings in the array
+            foreach ($searchString in $searchStrings) {
+                $matches = $logContent | Select-String -Pattern $searchString
+                if ($matches) {
+                    foreach ($match in $matches) {
+                        $resultObject = [PSCustomObject]@{
+                            LogFile     = $logFile
+                            Line        = $match.Line
+                            LineNumber  = $match.LineNumber
+                            Match       = $match.Matches.Value
+                            SearchString= $searchString
+                        }
+                        $results += $resultObject
                     }
-                    $results += $resultObject
                 }
-            } else {
-                Write-Host "No matches found in: $logFile"
             }
         } else {
             Write-Host "Log file not found: $logFile"
