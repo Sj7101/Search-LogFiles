@@ -1,13 +1,16 @@
 function Search-LogFiles {
     param (
         [string[]]$logFiles,          # Array of log file paths to search
-        [string[]]$searchStrings      # Array of strings to search for
+        [string[]]$searchStrings,     # Array of strings to search for
+        [PSCredential]$credentials    # Optional credentials parameter
     )
     
     $results = @()
 
-    # Prompt for credentials using Get-Credential
-    $credentials = Get-Credential
+    # If no credentials are provided, use the current user's credentials
+    if (-not $credentials) {
+        $credentials = Get-Credential
+    }
 
     # Iterate through each log file
     foreach ($logFile in $logFiles) {
@@ -18,7 +21,7 @@ function Search-LogFiles {
         # Ensure the folderPath is a valid UNC path
         if ($folderPath -match "^\\\\") {
             try {
-                # Create a temporary PSDrive with the provided credentials mapped to the folder on the server
+                # Create a temporary PSDrive with the provided credentials mapped to the folder
                 New-PSDrive -Name $driveName -PSProvider FileSystem -Root $folderPath -Credential $credentials -Persist
 
                 if (Test-Path $logFile) {
@@ -69,14 +72,21 @@ function Search-LogFiles {
 
     return $results
 }
-<# $logFiles = @(
-    "\\server1\share\folder\log1.log", 
-    "\\server2\share\folder\log2.log", 
-    "\\server3\share\folder\log3.log"
+
+<#
+# Get credentials manually
+$credentials = Get-Credential
+
+$logFiles = @(
+    "\\server1\D$\Logs\Many\log1.log", 
+    "\\server2\D$\Logs\Many\log2.log", 
+    "\\server3\D$\Logs\Many\log3.log"
 )
 $searchStrings = @("error(s)", "Warning", "Failed")
-$results = Search-LogFiles -logFiles $logFiles -searchStrings $searchStrings
+
+$results = Search-LogFiles -logFiles $logFiles -searchStrings $searchStrings -credentials $credentials
 
 # Display the results
 $results | Format-Table -Property LogFile, LineNumber, Match, SearchString
+
 #>
