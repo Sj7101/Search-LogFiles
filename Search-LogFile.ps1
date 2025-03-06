@@ -20,12 +20,15 @@ function Search-LogFiles {
     # Ensure the folderPath is a valid UNC path
     if ($folderPath -match "^\\\\") {
         try {
-            # Map the UNC folder path to a temporary drive (directly to the folder)
+            # Debugging: Output the folder path we are mapping to
+            Write-Host "Mapping the folder: $folderPath"
+            
+            # Map the UNC folder path to a temporary drive (directly to the 'logs' folder)
             New-PSDrive -Name $driveName -PSProvider FileSystem -Root $folderPath -Credential $credentials
 
-            # Debugging: Confirm folder is mapped correctly
+            # Debugging: Check if the mapped drive is available
             Write-Host "Mapped drive: \\$driveName"
-            
+
             # Get all the log files matching the search pattern (e.g., SMTP*) - no file extension filter
             $logFiles = Get-ChildItem -Path "\\$driveName" -Filter $searchPattern -File
 
@@ -77,8 +80,8 @@ function Search-LogFiles {
 
     return $results
 }
-<#
-$folderPath = "\\server1\D$\Logs\Many"
+<# 
+$folderPath = "\\server1\D$\Folder\ziplip\logs"
 $searchPattern = "SMTP*"  # Match all files starting with SMTP
 $searchStrings = @("error(s)", "Warning", "Failed")
 
