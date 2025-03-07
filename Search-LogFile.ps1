@@ -40,7 +40,7 @@ function Search-LogsInZip {
             # Use Expand-Archive cmdlet to extract the zip file to the temporary folder
             Expand-Archive -Path $zipFile.FullName -DestinationPath $tempFolderPath -Force
 
-            # Get all the extracted log files (without extensions)
+            # Get all the extracted log files (without extensions) and filter by the search pattern
             $logFiles = Get-ChildItem -Path $tempFolderPath | Where-Object { $_.Name -like $searchPattern }
 
             # Process only the files that match the search pattern
@@ -113,5 +113,6 @@ function Search-LogsInZip {
         }
     }
 
+    # Return only the matched results
     return $results
 }
