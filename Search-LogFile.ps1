@@ -80,3 +80,8 @@ function Search-LogFiles {
 
     return $results
 }
+
+Invoke-Command -ComputerName 'server1' -ScriptBlock {
+    Get-ChildItem "\\server1\D$\Logs\Many\ziplip\logs"
+}
+
