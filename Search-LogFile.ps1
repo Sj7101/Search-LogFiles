@@ -2,7 +2,7 @@ function Search-LogFiles {
     param (
         [string]$folderPath,          # UNC path to the folder to search
         [string]$searchPattern,       # Wildcard pattern to match log files
-        [string[]]$searchStrings,     # Array of strings to search for
+        [string[]]$searchStrings = @(), # Optional array of strings to search for
         [PSCredential]$credentials    # Optional credentials parameter
     )
     
@@ -25,16 +25,18 @@ function Search-LogFiles {
             return
         }
 
-        # Attempt to list files from the UNC path to ensure visibility
+        # Test listing files directly using Get-ChildItem to confirm accessibility
         Write-Host "Attempting to list files in the directory: $folderPath"
+        
         $testFiles = Get-ChildItem -Path $folderPath
         if ($testFiles.Count -eq 0) {
             Write-Host "No files found in the directory '$folderPath'."
         } else {
             Write-Host "Found files in the directory: $($testFiles.Count)"
+            Write-Host "Files found: $($testFiles.Name)"
         }
 
-        # Get all the log files matching the search pattern (e.g., SMTP*) - no file extension filter
+        # Now attempt to search for the files matching the pattern
         Write-Host "Searching for files matching pattern '$searchPattern' in folder '$folderPath'"
         $logFiles = Get-ChildItem -Path $folderPath -Filter $searchPattern -File -Recurse
 
@@ -50,26 +52,28 @@ function Search-LogFiles {
             # Read the content of the log file
             $logContent = Get-Content -Path $logFile.FullName
 
-            # Search for any of the strings in the array using RegEx
-            foreach ($searchString in $searchStrings) {
-                # If searching for "error(s)", use a RegEx pattern
-                if ($searchString -match "^error\(s\)$") {
-                    $pattern = '\d+ error\(s\)'  # Match "1 error(s)", "2 error(s)", etc.
-                } else {
-                    $pattern = $searchString  # Use the search string directly
-                }
-
-                $matches = $logContent | Select-String -Pattern $pattern
-                if ($matches) {
-                    foreach ($match in $matches) {
-                        $resultObject = [PSCustomObject]@{
-                            LogFile     = $logFile.FullName
-                            Line        = $match.Line
-                            LineNumber  = $match.LineNumber
-                            Match       = $match.Matches.Value
-                            SearchString= $searchString
+            # If no search strings are provided, use the default regex (e.g., 1 error, 2 error)
+            if ($searchStrings.Count -eq 0) {
+                Write-Host "No search strings provided. Using default pattern to match '1 error', '2 error', etc."
+                # Updated regex pattern to match "1 error", "2 error", etc.
+                $pattern = '\d+ error' 
+            } else {
+                Write-Host "Searching using custom search strings."
+                # Use the provided search strings
+                foreach ($searchString in $searchStrings) {
+                    $pattern = $searchString
+                    $matches = $logContent | Select-String -Pattern $pattern
+                    if ($matches) {
+                        foreach ($match in $matches) {
+                            $resultObject = [PSCustomObject]@{
+                                LogFile     = $logFile.FullName
+                                Line        = $match.Line
+                                LineNumber  = $match.LineNumber
+                                Match       = $match.Matches.Value
+                                SearchString= $searchString
+                            }
+                            $results += $resultObject
                         }
-                        $results += $resultObject
                     }
                 }
             }
@@ -80,8 +84,13 @@ function Search-LogFiles {
 
     return $results
 }
+<#
+$folderPath = "\\server1\D$\Logs\Many\ziplip\logs"
+$searchPattern = "SMTP*"  # Match all files starting with SMTP
 
-Invoke-Command -ComputerName 'server1' -ScriptBlock {
-    Get-ChildItem "\\server1\D$\Logs\Many\ziplip\logs"
-}
+# Call the Search-LogFiles function (no search strings provided, uses default pattern '1 error', '2 error', etc.)
+$results = Search-LogFiles -folderPath $folderPath -searchPattern $searchPattern
 
+# Display the results
+$results | Format-Table -Property LogFile, LineNumber, Match, SearchString
+#>
