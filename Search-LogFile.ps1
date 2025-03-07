@@ -13,16 +13,29 @@ function Search-LogFiles {
         $credentials = Get-Credential
     }
 
-    # Check if the UNC path is accessible
-    if (Test-Path $folderPath) {
-        Write-Host "The folder path '$folderPath' is accessible."
-    } else {
-        Write-Host "ERROR: The folder path '$folderPath' is not accessible."
-        return
-    }
+    # Debugging: Confirm UNC path access using Test-Path
+    Write-Host "Checking UNC path access: $folderPath"
 
-    # Get all the log files matching the search pattern (e.g., SMTP*) - no file extension filter
     try {
+        # Check if the UNC path is accessible
+        if (Test-Path $folderPath) {
+            Write-Host "The UNC path '$folderPath' is accessible."
+        } else {
+            Write-Host "ERROR: The UNC path '$folderPath' is not accessible."
+            return
+        }
+
+        # Attempt to list files from the UNC path to ensure visibility
+        Write-Host "Attempting to list files in the directory:"
+        $testFiles = Get-ChildItem -Path $folderPath
+        if ($testFiles.Count -eq 0) {
+            Write-Host "No files found in the directory '$folderPath'."
+        } else {
+            Write-Host "Found files in the directory: $($testFiles.Count)"
+        }
+
+        # Get all the log files matching the search pattern (e.g., SMTP*) - no file extension filter
+        Write-Host "Searching for files matching pattern '$searchPattern' in folder '$folderPath'"
         $logFiles = Get-ChildItem -Path $folderPath -Filter $searchPattern -File -Recurse
 
         # Check if any files are found
@@ -62,19 +75,8 @@ function Search-LogFiles {
             }
         }
     } catch {
-        Write-Host "Error retrieving files from '$folderPath': $_"
+        Write-Host "ERROR: There was an issue: $_"
     }
 
     return $results
 }
-<#
-$folderPath = "\\server1\D$\Logs\Many\ziplip\logs"
-$searchPattern = "SMTP*"  # Match all files starting with SMTP
-$searchStrings = @("error(s)", "Warning", "Failed")
-
-# Call the Search-LogFiles function
-$results = Search-LogFiles -folderPath $folderPath -searchPattern $searchPattern -searchStrings $searchStrings
-
-# Display the results
-$results | Format-Table -Property LogFile, LineNumber, Match, SearchString
-#>
