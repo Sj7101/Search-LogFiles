@@ -21,8 +21,8 @@ function Search-LogsInZip {
         return
     }
 
-    # Get the list of all .zip files in the directory
-    $zipFiles = Get-ChildItem -Path $folderPath -Filter "*.zip"
+    # Get the list of all .zip files in the directory (Suppress output here)
+    $zipFiles = Get-ChildItem -Path $folderPath -Filter "*.zip" | Out-Null
     if ($zipFiles.Count -eq 0) {
         Write-Host "No zip files found in the folder '$folderPath'."
         return
@@ -37,12 +37,12 @@ function Search-LogsInZip {
         New-Item -Path $tempFolderPath -ItemType Directory -Force
 
         try {
-            # Use Expand-Archive cmdlet to extract the zip file to the temporary folder
-            Expand-Archive -Path $zipFile.FullName -DestinationPath $tempFolderPath -Force
+            # Use Expand-Archive cmdlet to extract the zip file to the temporary folder (Suppress output here)
+            Expand-Archive -Path $zipFile.FullName -DestinationPath $tempFolderPath -Force | Out-Null
 
             # Get all the extracted log files (without extensions) and filter by the search pattern
             $logFiles = Get-ChildItem -Path $tempFolderPath | Where-Object { 
-                $_.Name -like $searchPattern -and $_.PSIsContainer -eq $false
+                $_.Name -like $searchPattern -and -not $_.PSIsContainer
             }
 
             # Process only the files that match the search pattern
@@ -116,6 +116,6 @@ function Search-LogsInZip {
         }
     }
 
-    # Return only the matched results (excluding metadata about the zip files)
+    # Explicitly return only the matched results (and suppress any extra output)
     return $results
 }
