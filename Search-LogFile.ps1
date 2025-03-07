@@ -62,7 +62,7 @@ function Search-LogsInZip {
                 if ($logTimestamp) {
                     # Parse the timestamp from the log content using the exact format
                     try {
-                        # Ensure that the date format handles the uppercase month properly
+                        # Explicitly handle uppercase months
                         $logTimestamp = [datetime]::ParseExact($logTimestamp, 'dd/MMM/yyyy:HH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
                     } catch {
                         Write-Host "ERROR: Failed to parse the timestamp: $logTimestamp"
