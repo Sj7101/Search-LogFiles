@@ -60,8 +60,13 @@ function Search-LogsInZip {
                 }
 
                 if ($logTimestamp) {
-                    # Parse the timestamp
-                    $logTimestamp = [datetime]::ParseExact($logTimestamp, 'dd/MMM/yyyy:HH:mm:ss', $null)
+                    # Parse the timestamp from the log content
+                    try {
+                        $logTimestamp = [datetime]::ParseExact($logTimestamp, 'dd/MMM/yyyy:HH:mm:ss', $null)
+                    } catch {
+                        Write-Host "ERROR: Failed to parse the timestamp: $logTimestamp"
+                        continue
+                    }
 
                     # Compare the timestamp with the provided range
                     if ($logTimestamp -ge $startTimestamp -and $logTimestamp -le $endTimestamp) {
