@@ -57,12 +57,29 @@ function Search-LogFiles {
                 Write-Host "No search strings provided. Using default pattern to match '1 error', '2 error', etc."
                 # Updated regex pattern to match "1 error", "2 error", etc.
                 $pattern = '\d+ error' 
+                Write-Host "Applying default pattern: $pattern"
+                $matches = $logContent | Select-String -Pattern $pattern -AllMatches
+                if ($matches) {
+                    foreach ($match in $matches) {
+                        Write-Host "Found match: $($match.Matches.Value)"
+                        $resultObject = [PSCustomObject]@{
+                            LogFile     = $logFile.FullName
+                            Line        = $match.Line
+                            LineNumber  = $match.LineNumber
+                            Match       = $match.Matches.Value
+                            SearchString= "Default pattern: $pattern"
+                        }
+                        $results += $resultObject
+                    }
+                } else {
+                    Write-Host "No match found for default pattern: $pattern"
+                }
             } else {
                 Write-Host "Searching using custom search strings."
                 # Use the provided search strings
                 foreach ($searchString in $searchStrings) {
                     $pattern = $searchString
-                    Write-Host "Applying search string pattern: $pattern"
+                    Write-Host "Applying custom pattern: $pattern"
                     $matches = $logContent | Select-String -Pattern $pattern -AllMatches
 
                     if ($matches) {
@@ -78,7 +95,7 @@ function Search-LogFiles {
                             $results += $resultObject
                         }
                     } else {
-                        Write-Host "No match found for pattern: $pattern"
+                        Write-Host "No match found for custom pattern: $pattern"
                     }
                 }
             }
@@ -89,8 +106,6 @@ function Search-LogFiles {
 
     return $results
 }
-
-
 <#
 $folderPath = "\\server1\D$\Logs\Many\ziplip\logs"
 $searchPattern = "SMTP*"  # Match all files starting with SMTP
