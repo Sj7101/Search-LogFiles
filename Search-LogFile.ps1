@@ -60,7 +60,7 @@ function Search-LogsInZip {
                 }
 
                 if ($logTimestamp) {
-                    # Parse the timestamp from the log content
+                    # Parse the timestamp from the log content using the exact format
                     try {
                         $logTimestamp = [datetime]::ParseExact($logTimestamp, 'dd/MMM/yyyy:HH:mm:ss', $null)
                     } catch {
