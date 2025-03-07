@@ -55,8 +55,8 @@ function Search-LogFiles {
             # If no search strings are provided, use the default regex (e.g., 1 error, 2 error)
             if ($searchStrings.Count -eq 0) {
                 Write-Host "No search strings provided. Using default pattern to match '1 error', '2 error', etc."
-                # Updated regex pattern to match "1 error", "2 error", etc.
-                $pattern = '\d+ error' 
+                # Updated regex pattern to match "1 error", "2 error", etc., and avoid "0 error"
+                $pattern = '([1-9][0-9]*|[1-9]) error' 
                 Write-Host "Applying default pattern: $pattern"
                 $matches = $logContent | Select-String -Pattern $pattern -AllMatches
                 if ($matches) {
@@ -106,13 +106,3 @@ function Search-LogFiles {
 
     return $results
 }
-<#
-$folderPath = "\\server1\D$\Logs\Many\ziplip\logs"
-$searchPattern = "SMTP*"  # Match all files starting with SMTP
-
-# Call the Search-LogFiles function (no search strings provided, uses default pattern '1 error', '2 error', etc.)
-$results = Search-LogFiles -folderPath $folderPath -searchPattern $searchPattern
-
-# Display the results
-$results | Format-Table -Property LogFile, LineNumber, Match, SearchString
-#>
