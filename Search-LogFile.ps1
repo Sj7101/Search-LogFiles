@@ -32,17 +32,11 @@ function Search-LogsInZip {
     foreach ($zipFile in $zipFiles) {
         Write-Host "Processing zip file: $($zipFile.FullName)"
         
-        # Extract the zip file to a temporary folder
+        # Extract the zip file to a temporary folder using Expand-Archive (available in PowerShell 5.1 and later)
         $tempFolder = New-TemporaryFile | Remove-Item -Force | New-Item -ItemType Directory
         try {
-            # Use Expand-Archive if in PowerShell Core (6 and above) or Windows PowerShell 5.1+
-            if ($PSVersionTable.PSVersion.Major -ge 6) {
-                # For PowerShell Core (v6+), use Expand-Archive
-                Expand-Archive -Path $zipFile.FullName -DestinationPath $tempFolder.FullName -Force
-            } else {
-                # For Windows PowerShell, use System.IO.Compression.ZipFile
-                [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile.FullName, $tempFolder.FullName)
-            }
+            # Use Expand-Archive cmdlet to extract the zip file
+            Expand-Archive -Path $zipFile.FullName -DestinationPath $tempFolder.FullName -Force
 
             # Get all the extracted log files (without extensions)
             $logFiles = Get-ChildItem -Path $tempFolder.FullName
