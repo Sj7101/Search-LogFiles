@@ -8,6 +8,11 @@ function Search-LogsInZip {
         [PSCredential]$credentials    # Optional credentials parameter
     )
     
+    # Load System.IO.Compression if it's not already loaded
+    if (-not [System.IO.Compression.ZipFile]) {
+        Add-Type -AssemblyName "System.IO.Compression.FileSystem"
+    }
+
     $results = @()
 
     # If no credentials are provided, use the current user's credentials
