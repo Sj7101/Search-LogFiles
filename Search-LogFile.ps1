@@ -13,77 +13,56 @@ function Search-LogFiles {
         $credentials = Get-Credential
     }
 
-    # Create a temporary drive letter based on the server name
-    $serverName = ($folderPath -split '\\')[2]  # Extract the server name from the UNC path
-    $driveName = "Z"  # Use a fixed temporary drive letter (Z)
+    # Check if the UNC path is accessible
+    if (Test-Path $folderPath) {
+        Write-Host "The folder path '$folderPath' is accessible."
+    } else {
+        Write-Host "ERROR: The folder path '$folderPath' is not accessible."
+        return
+    }
 
-    # Ensure the folderPath is a valid UNC path
-    if ($folderPath -match "^\\\\") {
-        try {
-            # Debugging: Output the folder path we are mapping to
-            Write-Host "Mapping the folder: $folderPath"
+    # Get all the log files matching the search pattern (e.g., SMTP*) - no file extension filter
+    try {
+        $logFiles = Get-ChildItem -Path $folderPath -Filter $searchPattern -File -Recurse
+
+        # Check if any files are found
+        if ($logFiles.Count -eq 0) {
+            Write-Host "No files found matching the pattern '$searchPattern'."
+        }
+
+        # Iterate over each found log file
+        foreach ($logFile in $logFiles) {
+            Write-Host "Searching in: $($logFile.FullName)"
             
-            # First, check if the UNC path is valid before mapping it
-            if (Test-Path $folderPath) {
-                Write-Host "The folder path '$folderPath' exists and is accessible."
-            } else {
-                Write-Host "ERROR: The folder path '$folderPath' does not exist or is not accessible."
-                return
-            }
+            # Read the content of the log file
+            $logContent = Get-Content -Path $logFile.FullName
 
-            # Map the UNC folder path to a temporary drive (directly to the 'logs' folder)
-            New-PSDrive -Name $driveName -PSProvider FileSystem -Root $folderPath -Credential $credentials
+            # Search for any of the strings in the array using RegEx
+            foreach ($searchString in $searchStrings) {
+                # If searching for "error(s)", use a RegEx pattern
+                if ($searchString -match "^error\(s\)$") {
+                    $pattern = '\d+ error\(s\)'  # Match "1 error(s)", "2 error(s)", etc.
+                } else {
+                    $pattern = $searchString  # Use the search string directly
+                }
 
-            # Debugging: Check if the mapped drive is available
-            Write-Host "Mapped drive: \\$driveName"
-
-            # Get all the log files matching the search pattern (e.g., SMTP*) - no file extension filter
-            $logFiles = Get-ChildItem -Path "\\$driveName" -Filter $searchPattern -File
-
-            # Check if any files are found
-            if ($logFiles.Count -eq 0) {
-                Write-Host "No files found matching the pattern '$searchPattern'."
-            }
-
-            # Iterate over each found log file
-            foreach ($logFile in $logFiles) {
-                Write-Host "Searching in: $($logFile.FullName)"
-                
-                # Read the content of the log file
-                $logContent = Get-Content -Path $logFile.FullName
-
-                # Search for any of the strings in the array using RegEx
-                foreach ($searchString in $searchStrings) {
-                    # If searching for "error(s)", use a RegEx pattern
-                    if ($searchString -match "^error\(s\)$") {
-                        $pattern = '\d+ error\(s\)'  # Match "1 error(s)", "2 error(s)", etc.
-                    } else {
-                        $pattern = $searchString  # Use the search string directly
-                    }
-
-                    $matches = $logContent | Select-String -Pattern $pattern
-                    if ($matches) {
-                        foreach ($match in $matches) {
-                            $resultObject = [PSCustomObject]@{
-                                LogFile     = $logFile.FullName
-                                Line        = $match.Line
-                                LineNumber  = $match.LineNumber
-                                Match       = $match.Matches.Value
-                                SearchString= $searchString
-                            }
-                            $results += $resultObject
+                $matches = $logContent | Select-String -Pattern $pattern
+                if ($matches) {
+                    foreach ($match in $matches) {
+                        $resultObject = [PSCustomObject]@{
+                            LogFile     = $logFile.FullName
+                            Line        = $match.Line
+                            LineNumber  = $match.LineNumber
+                            Match       = $match.Matches.Value
+                            SearchString= $searchString
                         }
+                        $results += $resultObject
                     }
                 }
             }
-
-            # Remove the temporary mapped drive after usage
-            Remove-PSDrive -Name $driveName
-        } catch {
-            Write-Host "Error mapping network drive to $($folderPath): $_"
         }
-    } else {
-        Write-Host "Invalid network path: $folderPath"
+    } catch {
+        Write-Host "Error retrieving files from '$folderPath': $_"
     }
 
     return $results
