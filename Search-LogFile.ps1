@@ -26,7 +26,7 @@ function Search-LogFiles {
         }
 
         # Attempt to list files from the UNC path to ensure visibility
-        Write-Host "Attempting to list files in the directory:"
+        Write-Host "Attempting to list files in the directory: $folderPath"
         $testFiles = Get-ChildItem -Path $folderPath
         if ($testFiles.Count -eq 0) {
             Write-Host "No files found in the directory '$folderPath'."
