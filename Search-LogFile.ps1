@@ -1,7 +1,7 @@
 function Search-LogsInZip {
     param (
         [string]$folderPath,          # UNC path to the folder containing .zip files
-        [string]$searchPattern,       # Wildcard pattern to match log files
+        [string]$searchPattern,       # Wildcard pattern to match log files (e.g., SMTP*)
         [string[]]$searchStrings = @(), # Optional array of strings to search for
         [string]$startTimestamp,      # Start timestamp in the format DD/MMM/YYYY:HH:MM:SS
         [string]$endTimestamp,        # End timestamp in the format DD/MMM/YYYY:HH:MM:SS
@@ -41,7 +41,9 @@ function Search-LogsInZip {
             Expand-Archive -Path $zipFile.FullName -DestinationPath $tempFolderPath -Force
 
             # Get all the extracted log files (without extensions)
-            $logFiles = Get-ChildItem -Path $tempFolderPath
+            $logFiles = Get-ChildItem -Path $tempFolderPath | Where-Object { $_.Name -like $searchPattern }
+
+            # Process only the files that match the search pattern
             foreach ($logFile in $logFiles) {
                 Write-Host "Processing log file: $($logFile.FullName)"
                 
