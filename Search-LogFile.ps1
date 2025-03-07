@@ -62,9 +62,12 @@ function Search-LogFiles {
                 # Use the provided search strings
                 foreach ($searchString in $searchStrings) {
                     $pattern = $searchString
-                    $matches = $logContent | Select-String -Pattern $pattern
+                    Write-Host "Applying search string pattern: $pattern"
+                    $matches = $logContent | Select-String -Pattern $pattern -AllMatches
+
                     if ($matches) {
                         foreach ($match in $matches) {
+                            Write-Host "Found match: $($match.Matches.Value)"
                             $resultObject = [PSCustomObject]@{
                                 LogFile     = $logFile.FullName
                                 Line        = $match.Line
@@ -74,6 +77,8 @@ function Search-LogFiles {
                             }
                             $results += $resultObject
                         }
+                    } else {
+                        Write-Host "No match found for pattern: $pattern"
                     }
                 }
             }
@@ -84,6 +89,8 @@ function Search-LogFiles {
 
     return $results
 }
+
+
 <#
 $folderPath = "\\server1\D$\Logs\Many\ziplip\logs"
 $searchPattern = "SMTP*"  # Match all files starting with SMTP
