@@ -32,14 +32,16 @@ function Search-LogsInZip {
     foreach ($zipFile in $zipFiles) {
         Write-Host "Processing zip file: $($zipFile.FullName)"
         
-        # Extract the zip file to a temporary folder using Expand-Archive (available in PowerShell 5.1 and later)
-        $tempFolder = New-TemporaryFile | Remove-Item -Force | New-Item -ItemType Directory
+        # Create a temporary folder for extraction
+        $tempFolderPath = Join-Path -Path $env:TEMP -ChildPath ([System.IO.Path]::GetFileNameWithoutExtension($zipFile.Name))
+        New-Item -Path $tempFolderPath -ItemType Directory -Force
+
         try {
-            # Use Expand-Archive cmdlet to extract the zip file
-            Expand-Archive -Path $zipFile.FullName -DestinationPath $tempFolder.FullName -Force
+            # Use Expand-Archive cmdlet to extract the zip file to the temporary folder
+            Expand-Archive -Path $zipFile.FullName -DestinationPath $tempFolderPath -Force
 
             # Get all the extracted log files (without extensions)
-            $logFiles = Get-ChildItem -Path $tempFolder.FullName
+            $logFiles = Get-ChildItem -Path $tempFolderPath
             foreach ($logFile in $logFiles) {
                 Write-Host "Processing log file: $($logFile.FullName)"
                 
@@ -105,7 +107,7 @@ function Search-LogsInZip {
             Write-Host "ERROR: Failed to extract or process zip file: $($zipFile.FullName) - $_"
         } finally {
             # Clean up the temporary folder
-            Remove-Item -Path $tempFolder.FullName -Recurse -Force
+            Remove-Item -Path $tempFolderPath -Recurse -Force
         }
     }
 
