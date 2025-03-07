@@ -1,9 +1,10 @@
-function Search-LogFiles {
+function Search-LogsInZip {
     param (
-        [string[]]$folderPaths,          # Array of UNC paths to the folders to search
-        [string]$searchPattern,          # Wildcard pattern to match log files
-        [string[]]$searchStrings = @(),  # Optional array of strings to search for
-        [PSCredential]$credentials      # Optional credentials parameter
+        [string]$folderPath,          # UNC path to the folder containing .zip files
+        [string]$searchPattern,       # Wildcard pattern to match log files
+        [string[]]$searchStrings = @(), # Optional array of strings to search for
+        [datetime]$timestampToMatch,  # Timestamp in the format DD/MMM/YYYY:HH:MM:SS (e.g., "05/MAR/2025:17:32:02")
+        [PSCredential]$credentials    # Optional credentials parameter
     )
     
     $results = @()
@@ -13,98 +14,114 @@ function Search-LogFiles {
         $credentials = Get-Credential
     }
 
-    # Iterate through each folder path
-    foreach ($folderPath in $folderPaths) {
-        Write-Host "Checking UNC path access: $folderPath"
+    # Check if the UNC path is accessible
+    if (-not (Test-Path $folderPath)) {
+        Write-Host "ERROR: The UNC path '$folderPath' is not accessible."
+        return
+    }
 
+    # Get the list of all .zip files in the directory
+    $zipFiles = Get-ChildItem -Path $folderPath -Filter "*.zip"
+    if ($zipFiles.Count -eq 0) {
+        Write-Host "No zip files found in the folder '$folderPath'."
+        return
+    }
+
+    # Iterate over each .zip file
+    foreach ($zipFile in $zipFiles) {
+        Write-Host "Processing zip file: $($zipFile.FullName)"
+        
+        # Extract the zip file to a temporary folder
+        $tempFolder = New-TemporaryFile | Remove-Item -Force | New-Item -ItemType Directory
         try {
-            # Check if the UNC path is accessible
-            if (Test-Path $folderPath) {
-                Write-Host "The UNC path '$folderPath' is accessible."
-            } else {
-                Write-Host "ERROR: The UNC path '$folderPath' is not accessible."
-                continue  # Skip to next folder if path is not accessible
-            }
+            [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile.FullName, $tempFolder.FullName)
 
-            # Test listing files directly using Get-ChildItem to confirm accessibility
-            Write-Host "Attempting to list files in the directory: $folderPath"
-            
-            $testFiles = Get-ChildItem -Path $folderPath
-            if ($testFiles.Count -eq 0) {
-                Write-Host "No files found in the directory '$folderPath'."
-            } else {
-                Write-Host "Found files in the directory: $($testFiles.Count)"
-                Write-Host "Files found: $($testFiles.Name)"
-            }
-
-            # Now attempt to search for the files matching the pattern
-            Write-Host "Searching for files matching pattern '$searchPattern' in folder '$folderPath'"
-            $logFiles = Get-ChildItem -Path $folderPath -Filter $searchPattern -File -Recurse
-
-            # Check if any files are found
-            if ($logFiles.Count -eq 0) {
-                Write-Host "No files found matching the pattern '$searchPattern'."
-            }
-
-            # Iterate over each found log file
+            # Get all the extracted log files (without extensions)
+            $logFiles = Get-ChildItem -Path $tempFolder.FullName
             foreach ($logFile in $logFiles) {
-                Write-Host "Searching in: $($logFile.FullName)"
+                Write-Host "Processing log file: $($logFile.FullName)"
                 
-                # Read the content of the log file
+                # Read the last line of the log file to check the timestamp
                 $logContent = Get-Content -Path $logFile.FullName
+                $lastLine = $logContent[-1]
 
-                # If no search strings are provided, use the default regex (e.g., 1 error, 2 error)
-                if ($searchStrings.Count -eq 0) {
-                    Write-Host "No search strings provided. Using default pattern to match '1 error', '2 error', etc."
-                    # Updated regex pattern to match "1 error", "2 error", etc., and avoid "0 error"
-                    $pattern = '^(?!0$)\d+ error'
-                    Write-Host "Applying default pattern: $pattern"
-                    $matches = $logContent | Select-String -Pattern $pattern -AllMatches
-                    if ($matches) {
-                        foreach ($match in $matches) {
-                            Write-Host "Found match: $($match.Matches.Value)"
+                # Match the timestamp in the last line (DD/MMM/YYYY:HH:MM:SS)
+                $timestampPattern = '\d{2}/[A-Z]{3}/\d{4}:\d{2}:\d{2}:\d{2}'
+                if ($lastLine -match $timestampPattern) {
+                    $logTimestamp = $matches[0]
+                    Write-Host "Last line timestamp: $logTimestamp"
+
+                    # Compare the log file timestamp with the provided timestamp
+                    if ($logTimestamp -eq $timestampToMatch) {
+                        Write-Host "Timestamp matches. Searching for matches in log file."
+
+                        # Search for the provided search strings or the default regex
+                        $pattern = if ($searchStrings.Count -eq 0) { '([1-9][0-9]* error)' } else { $searchStrings }
+                        
+                        # Process each line of the log file
+                        $lineMatches = $logContent | Select-String -Pattern $pattern -AllMatches
+                        
+                        foreach ($lineMatch in $lineMatches) {
+                            # Capture the matched line and the 5 lines above it
+                            $lineNumber = $lineMatch.LineNumber
+                            $matchedLine = $lineMatch.Line
+                            $linesToCapture = @()
+
+                            # Capture the matched line and 5 lines above
+                            for ($i = $lineNumber - 5; $i -le $lineNumber; $i++) {
+                                if ($i -gt 0 -and $i -lt $logContent.Count) {
+                                    $linesToCapture += $logContent[$i]
+                                }
+                            }
+
+                            # Create a result object with the matched lines
                             $resultObject = [PSCustomObject]@{
                                 LogFile     = $logFile.FullName
-                                Line        = $match.Line
-                                LineNumber  = $match.LineNumber
-                                Match       = $match.Matches.Value
-                                SearchString= "Default pattern: $pattern"
+                                LineNumber  = $lineNumber
+                                Match       = $matchedLine
+                                LinesAbove  = $linesToCapture -join "`n"
+                                SearchString= $pattern
                             }
                             $results += $resultObject
                         }
                     } else {
-                        Write-Host "No match found for default pattern: $pattern"
+                        Write-Host "Timestamp does not match."
                     }
                 } else {
-                    Write-Host "Searching using custom search strings."
-                    # Use the provided search strings
-                    foreach ($searchString in $searchStrings) {
-                        $pattern = $searchString
-                        Write-Host "Applying custom pattern: $pattern"
-                        $matches = $logContent | Select-String -Pattern $pattern -AllMatches
-
-                        if ($matches) {
-                            foreach ($match in $matches) {
-                                Write-Host "Found match: $($match.Matches.Value)"
-                                $resultObject = [PSCustomObject]@{
-                                    LogFile     = $logFile.FullName
-                                    Line        = $match.Line
-                                    LineNumber  = $match.LineNumber
-                                    Match       = $match.Matches.Value
-                                    SearchString= $searchString
-                                }
-                                $results += $resultObject
-                            }
-                        } else {
-                            Write-Host "No match found for custom pattern: $pattern"
-                        }
-                    }
+                    Write-Host "Last line does not contain a valid timestamp."
                 }
             }
         } catch {
-            Write-Host "ERROR: There was an issue with folder '$folderPath': $_"
+            Write-Host "ERROR: Failed to extract or process zip file: $($zipFile.FullName) - $_"
+        } finally {
+            # Clean up the temporary folder
+            Remove-Item -Path $tempFolder.FullName -Recurse -Force
         }
     }
 
     return $results
 }
+
+<#
+$folderPath = "\\server1\D$\Logs\Many\ziplip\logs"
+$searchPattern = "SMTP*"  # Match all files starting with SMTP
+$timestampToMatch = "05/MAR/2025:17:32:02"  # Exact timestamp to match
+
+# Call the Search-LogsInZip function (no search strings provided, uses default pattern '1 error', '2 error', etc.)
+$results = Search-LogsInZip -folderPath $folderPath -searchPattern $searchPattern -timestampToMatch $timestampToMatch
+
+# Display the results
+$results | Format-Table -Property LogFile, LineNumber, Match, SearchString, LinesAbove
+
+
+$folderPath = "\\server1\D$\Logs\Many\ziplip\logs"
+$searchPattern = "SMTP*"  # Match all files starting with SMTP
+$searchStrings = @("Warning", "Failed")  # Custom search strings
+$timestampToMatch = "05/MAR/2025:17:32:02"  # Exact timestamp to match
+
+$results = Search-LogsInZip -folderPath $folderPath -searchPattern $searchPattern -searchStrings $searchStrings -timestampToMatch $timestampToMatch
+
+# Display the results
+$results | Format-Table -Property LogFile, LineNumber, Match, SearchString, LinesAbove
+
+#>
