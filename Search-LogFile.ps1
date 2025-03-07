@@ -3,7 +3,8 @@ function Search-LogsInZip {
         [string]$folderPath,          # UNC path to the folder containing .zip files
         [string]$searchPattern,       # Wildcard pattern to match log files
         [string[]]$searchStrings = @(), # Optional array of strings to search for
-        [datetime]$timestampToMatch,  # Timestamp in the format DD/MMM/YYYY:HH:MM:SS (e.g., "05/MAR/2025:17:32:02")
+        [datetime]$startTimestamp,    # Start timestamp in the format DD/MMM/YYYY:HH:MM:SS
+        [datetime]$endTimestamp,      # End timestamp in the format DD/MMM/YYYY:HH:MM:SS
         [PSCredential]$credentials    # Optional credentials parameter
     )
     
@@ -41,19 +42,30 @@ function Search-LogsInZip {
             foreach ($logFile in $logFiles) {
                 Write-Host "Processing log file: $($logFile.FullName)"
                 
-                # Read the last line of the log file to check the timestamp
+                # Read the content of the log file
                 $logContent = Get-Content -Path $logFile.FullName
                 $lastLine = $logContent[-1]
-
-                # Match the timestamp in the last line (DD/MMM/YYYY:HH:MM:SS)
                 $timestampPattern = '\d{2}/[A-Z]{3}/\d{4}:\d{2}:\d{2}:\d{2}'
-                if ($lastLine -match $timestampPattern) {
-                    $logTimestamp = $matches[0]
-                    Write-Host "Last line timestamp: $logTimestamp"
 
-                    # Compare the log file timestamp with the provided timestamp
-                    if ($logTimestamp -eq $timestampToMatch) {
-                        Write-Host "Timestamp matches. Searching for matches in log file."
+                # Check for timestamp in the last line or the previous 5 lines
+                $logTimestamp = $null
+                $linesToCheck = $logContent[-6..-1]  # Get the last 6 lines (last line + 5 lines before)
+
+                foreach ($line in $linesToCheck) {
+                    if ($line -match $timestampPattern) {
+                        $logTimestamp = $matches[0]
+                        Write-Host "Timestamp found: $logTimestamp"
+                        break
+                    }
+                }
+
+                if ($logTimestamp) {
+                    # Parse the timestamp
+                    $logTimestamp = [datetime]::ParseExact($logTimestamp, 'dd/MMM/yyyy:HH:mm:ss', $null)
+
+                    # Compare the timestamp with the provided range
+                    if ($logTimestamp -ge $startTimestamp -and $logTimestamp -le $endTimestamp) {
+                        Write-Host "Timestamp matches the range. Searching for matches in log file."
 
                         # Search for the provided search strings or the default regex
                         $pattern = if ($searchStrings.Count -eq 0) { '([1-9][0-9]* error)' } else { $searchStrings }
@@ -85,10 +97,10 @@ function Search-LogsInZip {
                             $results += $resultObject
                         }
                     } else {
-                        Write-Host "Timestamp does not match."
+                        Write-Host "Timestamp does not match the range."
                     }
                 } else {
-                    Write-Host "Last line does not contain a valid timestamp."
+                    Write-Host "No valid timestamp found in the last 6 lines."
                 }
             }
         } catch {
@@ -101,27 +113,3 @@ function Search-LogsInZip {
 
     return $results
 }
-
-<#
-$folderPath = "\\server1\D$\Logs\Many\ziplip\logs"
-$searchPattern = "SMTP*"  # Match all files starting with SMTP
-$timestampToMatch = "05/MAR/2025:17:32:02"  # Exact timestamp to match
-
-# Call the Search-LogsInZip function (no search strings provided, uses default pattern '1 error', '2 error', etc.)
-$results = Search-LogsInZip -folderPath $folderPath -searchPattern $searchPattern -timestampToMatch $timestampToMatch
-
-# Display the results
-$results | Format-Table -Property LogFile, LineNumber, Match, SearchString, LinesAbove
-
-
-$folderPath = "\\server1\D$\Logs\Many\ziplip\logs"
-$searchPattern = "SMTP*"  # Match all files starting with SMTP
-$searchStrings = @("Warning", "Failed")  # Custom search strings
-$timestampToMatch = "05/MAR/2025:17:32:02"  # Exact timestamp to match
-
-$results = Search-LogsInZip -folderPath $folderPath -searchPattern $searchPattern -searchStrings $searchStrings -timestampToMatch $timestampToMatch
-
-# Display the results
-$results | Format-Table -Property LogFile, LineNumber, Match, SearchString, LinesAbove
-
-#>
