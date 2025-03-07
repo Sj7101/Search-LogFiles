@@ -3,8 +3,8 @@ function Search-LogsInZip {
         [string]$folderPath,          # UNC path to the folder containing .zip files
         [string]$searchPattern,       # Wildcard pattern to match log files
         [string[]]$searchStrings = @(), # Optional array of strings to search for
-        [datetime]$startTimestamp,    # Start timestamp in the format DD/MMM/YYYY:HH:MM:SS
-        [datetime]$endTimestamp,      # End timestamp in the format DD/MMM/YYYY:HH:MM:SS
+        [string]$startTimestamp,      # Start timestamp in the format DD/MMM/YYYY:HH:MM:SS
+        [string]$endTimestamp,        # End timestamp in the format DD/MMM/YYYY:HH:MM:SS
         [PSCredential]$credentials    # Optional credentials parameter
     )
     
@@ -45,7 +45,7 @@ function Search-LogsInZip {
                 # Read the content of the log file
                 $logContent = Get-Content -Path $logFile.FullName
                 $lastLine = $logContent[-1]
-                $timestampPattern = '\d{2}/[A-Z]{3}/\d{4}:\d{2}:\d{2}:\d{2}'
+                $timestampPattern = '\d{2}/[A-Z]{3}/\d{4}:\d{2}:\d{2}:\d{2}'  # Pattern to match the timestamp format
 
                 # Check for timestamp in the last line or the previous 5 lines
                 $logTimestamp = $null
@@ -60,16 +60,7 @@ function Search-LogsInZip {
                 }
 
                 if ($logTimestamp) {
-                    # Parse the timestamp from the log content using the exact format
-                    try {
-                        # Explicitly handle uppercase months
-                        $logTimestamp = [datetime]::ParseExact($logTimestamp, 'dd/MMM/yyyy:HH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
-                    } catch {
-                        Write-Host "ERROR: Failed to parse the timestamp: $logTimestamp"
-                        continue
-                    }
-
-                    # Compare the timestamp with the provided range
+                    # Compare the extracted timestamp (as a string) with the provided range
                     if ($logTimestamp -ge $startTimestamp -and $logTimestamp -le $endTimestamp) {
                         Write-Host "Timestamp matches the range. Searching for matches in log file."
 
