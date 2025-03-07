@@ -41,7 +41,9 @@ function Search-LogsInZip {
             Expand-Archive -Path $zipFile.FullName -DestinationPath $tempFolderPath -Force
 
             # Get all the extracted log files (without extensions) and filter by the search pattern
-            $logFiles = Get-ChildItem -Path $tempFolderPath | Where-Object { $_.Name -like $searchPattern }
+            $logFiles = Get-ChildItem -Path $tempFolderPath | Where-Object { 
+                $_.Name -like $searchPattern -and $_.PSIsContainer -eq $false
+            }
 
             # Process only the files that match the search pattern
             foreach ($logFile in $logFiles) {
@@ -96,6 +98,7 @@ function Search-LogsInZip {
                                 LinesAbove  = $linesToCapture -join "`n"
                                 SearchString= $pattern
                             }
+                            # Add the result only if it's a match from the log file
                             $results += $resultObject
                         }
                     } else {
@@ -113,6 +116,6 @@ function Search-LogsInZip {
         }
     }
 
-    # Return only the matched results
+    # Return only the matched results (excluding metadata about the zip files)
     return $results
 }
