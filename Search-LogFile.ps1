@@ -21,8 +21,8 @@ function Search-LogsInZip {
         return
     }
 
-    # Get the list of all .zip files in the directory (Suppress output here)
-    $zipFiles = Get-ChildItem -Path $folderPath -Filter "*.zip" | Out-Null
+    # Get the list of all .zip files in the directory (without suppressing output here)
+    $zipFiles = Get-ChildItem -Path $folderPath -Filter "*.zip"
     if ($zipFiles.Count -eq 0) {
         Write-Host "No zip files found in the folder '$folderPath'."
         return
